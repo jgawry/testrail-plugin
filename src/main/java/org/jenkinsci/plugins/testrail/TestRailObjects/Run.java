@@ -26,15 +26,15 @@ public class Run {
     private int suiteId;
     private int id;
     private String description;
-    private String milestoneId;
+    private int milestoneId;
 
     public void setSuiteId(int suiteId) { this.suiteId = suiteId; }
     public void setId(int id) { this.id = id; }
     public void setDescription(String description) { this.description = description; }
-    public void setMilestoneId(String mid) { this.milestoneId = mid; }
+    public void setMilestoneId(int mid) { this.milestoneId = mid; }
 
     public int getSuiteId() { return this.suiteId; }
     public int getId() { return this.id; }
     public String getDescription() { return this.description; }
-    public String getMilestoneId() {return this.milestoneId; }
+    public int getMilestoneId() {return this.milestoneId; }
 }

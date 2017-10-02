@@ -39,11 +39,15 @@ import javax.servlet.ServletException;
 import javax.xml.bind.JAXBException;
 import java.io.IOException;
 import java.util.List;
+import java.util.logging.FileHandler;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 public class TestRailNotifier extends Notifier {
 
     private int testrailProject;
     private int testrailSuite;
+    private int testrailRun = -1;
     private String junitResultsGlob;
     private String testrailMilestone;
     private boolean enableMilestone;
@@ -51,9 +55,10 @@ public class TestRailNotifier extends Notifier {
 
     // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
     @DataBoundConstructor
-    public TestRailNotifier(int testrailProject, int testrailSuite, String junitResultsGlob, String testrailMilestone, boolean enableMilestone, boolean createNewTestcases) {
+    public TestRailNotifier(int testrailProject, int testrailSuite, int testrailRun, String junitResultsGlob, String testrailMilestone, boolean enableMilestone, boolean createNewTestcases) {
         this.testrailProject = testrailProject;
         this.testrailSuite = testrailSuite;
+        this.testrailRun = testrailRun;
         this.junitResultsGlob = junitResultsGlob;
         this.testrailMilestone = testrailMilestone;
         this.enableMilestone = enableMilestone;
@@ -64,6 +69,8 @@ public class TestRailNotifier extends Notifier {
     public int getTestrailProject() { return this.testrailProject; }
     public void setTestrailSuite(int suite) { this.testrailSuite = suite; }
     public int getTestrailSuite() { return this.testrailSuite; }
+    public void setTestrailRun(int run) { this.testrailRun = run; }
+    public int getTestrailRun() { return this.testrailRun; }
     public void setJunitResultsGlob(String glob) { this.junitResultsGlob = glob; }
     public String getJunitResultsGlob() { return this.junitResultsGlob; }
     public String getTestrailMilestone() { return this.testrailMilestone; }
@@ -144,7 +151,12 @@ public class TestRailNotifier extends Notifier {
         int runId = -1;
         TestRailResponse response;
         try {
-            runId = testrail.addRun(testCases.getProjectId(), testCases.getSuiteId(), milestoneId, runComment);
+            if (testrailRun == -1) {
+                runId = testrail.addRun(testCases.getProjectId(), testCases.getSuiteId(), milestoneId, runComment);
+            } else {
+                runId = testrailRun;
+            }
+
             response = testrail.addResultsForCases(runId, results);
         } catch (TestRailException e) {
             listener.getLogger().println("Error pushing results to TestRail");
@@ -160,12 +172,12 @@ public class TestRailNotifier extends Notifier {
             listener.getLogger().println("status: " + response.getStatus());
             listener.getLogger().println("body :\n" + response.getBody());
         }
-        try {
-            testrail.closeRun(runId);
-        } catch (Exception e) {
-            listener.getLogger().println("Failed to close test run in TestRail.");
-            listener.getLogger().println("EXCEPTION: " + e.getMessage());
-        }
+//        try {
+//            testrail.closeRun(runId);
+//        } catch (Exception e) {
+//            listener.getLogger().println("Failed to close test run in TestRail.");
+//            listener.getLogger().println("EXCEPTION: " + e.getMessage());
+//        }
 
         return buildResult;
     }
@@ -250,6 +262,8 @@ public class TestRailNotifier extends Notifier {
         private String testrailPassword = "";
         private TestRailClient testrail = new TestRailClient("", "", "");
 
+        Logger logger = Logger.getLogger("RunsLog");
+
         /**
          * In order to load the persisted global configuration, you have to
          * call load() in the constructor.
@@ -301,6 +315,44 @@ public class TestRailNotifier extends Notifier {
             }
 
             return items;
+        }
+
+        public ListBoxModel doFillTestrailRunItems(@QueryParameter int testrailProject) {
+            testrail.setHost(getTestrailHost());
+            testrail.setUser(getTestrailUser());
+            testrail.setPassword(getTestrailPassword());
+
+            try {
+
+                // This block configure the logger with handler and formatter
+                FileHandler fh = new FileHandler("/tmp/RunsLogFile.log");
+                logger.addHandler(fh);
+                SimpleFormatter formatter = new SimpleFormatter();
+                fh.setFormatter(formatter);
+
+                // the following statement is used to log any messages
+                logger.info("Run log");
+
+                ListBoxModel items = new ListBoxModel();
+                try {
+                    for (Run run : testrail.getProjectTestRuns(testrailProject, logger)) {
+                        logger.info("Run desc: " + run.getDescription() + ", run id: " + Integer.toString(run.getId()));
+                        items.add(run.getDescription(), Integer.toString(run.getId()));
+                    }
+                } catch (Exception e) {
+                    logger.info("Stuff went south: " + e);
+                }
+                return items;
+
+            } catch (SecurityException e) {
+                e.printStackTrace();
+
+                return null;
+            } catch (IOException e) {
+                e.printStackTrace();
+
+                return null;
+            }
         }
 
         public FormValidation doCheckTestrailSuite(@QueryParameter String value)

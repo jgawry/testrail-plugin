@@ -39,6 +39,8 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.InterruptedException;
 import java.util.List;
+import java.util.logging.Logger;
+
 import static org.jenkinsci.plugins.testrail.Utils.*;
 /**
  * Created by Drew on 3/19/14.
@@ -243,6 +245,49 @@ public class TestRailClient {
         return cases;
     }
 
+    public Run[] getProjectTestRuns(int projectId, Logger logger) throws IOException {
+        String body = httpGet("index.php?/api/v2/get_runs/" + projectId).getBody();
+        JSONArray json = new JSONArray(body);
+
+        logger.info("Runs json: " + json);
+
+        int numberOfRuns = json.length();
+        Run[] runs = new Run[numberOfRuns];
+
+        for (int i = 0, c = numberOfRuns; i < c; i++) {
+            JSONObject o = json.getJSONObject(i);
+
+            logger.info("Runs object: " + o);
+
+            runs[i] = createRunFromJson(o, logger);
+        }
+
+        return runs;
+    }
+
+    private Run createRunFromJson(JSONObject o, Logger logger) {
+        Run r = new Run();
+
+        r.setDescription(o.getString("name"));
+        r.setId(o.getInt("id"));
+
+        if (!o.isNull("suite_id")) {
+            r.setSuiteId(o.getInt("suite_id"));
+            logger.info("suite_id: " + o.getInt("suite_id"));
+        } else {
+            r.setSuiteId(-1);
+        }
+
+        if (!o.isNull("milestone_id")) {
+            r.setMilestoneId(o.getInt("milestone_id"));
+            logger.info("milestone_id: " + o.getInt("milestone_id"));
+        } else {
+            r.setMilestoneId(-1);
+        }
+
+        return r;
+    }
+
     public Section[] getSections(int projectId, int suiteId) throws IOException, ElementNotFoundException {
         String body = httpGet("index.php?/api/v2/get_sections/" + projectId + "&suite_id=" + suiteId).getBody();
         JSONArray json = new JSONArray(body);
@@ -255,6 +300,7 @@ public class TestRailClient {
 
         return sects;
     }
+
     private Section createSectionFromJSON(JSONObject o) {
         Section s = new Section();
 

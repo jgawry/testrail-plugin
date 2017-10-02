@@ -10,6 +10,11 @@
   <f:entry title="Suite" field="testrailSuite">
     <f:select />
   </f:entry>
+  <f:entry title="Run" field="testrailRun">
+    <f:select>
+        <option></option>
+    </f:select>
+  </f:entry>
   <f:entry title="Test Report XMLs" field="junitResultsGlob">
     <f:textbox />
   </f:entry>
