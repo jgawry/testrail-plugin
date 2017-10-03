@@ -151,7 +151,8 @@ public class TestRailNotifier extends Notifier {
         int runId = -1;
         TestRailResponse response;
         try {
-            if (testrailRun == -1) {
+            // Test run was not selected in the UI
+            if (testrailRun <= 0) {
                 runId = testrail.addRun(testCases.getProjectId(), testCases.getSuiteId(), milestoneId, runComment);
             } else {
                 runId = testrailRun;
@@ -220,23 +221,23 @@ public class TestRailNotifier extends Notifier {
                     }
                 }
                 if (addResult) {
-	                CaseStatus caseStatus;
-	                Float caseTime = testcase.getTime();
-	                String caseComment = null;
-	                Failure caseFailure = testcase.getFailure();
-	                if (caseFailure != null) {
-	                    caseStatus = CaseStatus.FAILED;
-	                    caseComment = (caseFailure.getMessage() == null) ? caseFailure.getText() : caseFailure.getMessage() + "\n" + caseFailure.getText();
-	                } else if (testcase.getSkipped() != null) {
-	                    caseStatus = CaseStatus.UNTESTED;
-	                } else {
-	                    caseStatus = CaseStatus.PASSED;
-	                }
+                    CaseStatus caseStatus;
+                    Float caseTime = testcase.getTime();
+                    String caseComment = null;
+                    Failure caseFailure = testcase.getFailure();
+                    if (caseFailure != null) {
+                        caseStatus = CaseStatus.FAILED;
+                        caseComment = (caseFailure.getMessage() == null) ? caseFailure.getText() : caseFailure.getMessage() + "\n" + caseFailure.getText();
+                    } else if (testcase.getSkipped() != null) {
+                        caseStatus = CaseStatus.UNTESTED;
+                    } else {
+                        caseStatus = CaseStatus.PASSED;
+                    }
 
-	                if (caseStatus != CaseStatus.UNTESTED){
-	                    results.addResult(new Result(caseId, caseStatus, caseComment, caseTime));
-	                }
-	            }
+                    if (caseStatus != CaseStatus.UNTESTED){
+                        results.addResult(new Result(caseId, caseStatus, caseComment, caseTime));
+                    }
+                }
             }
         }
 
@@ -261,8 +262,6 @@ public class TestRailNotifier extends Notifier {
         private String testrailUser = "";
         private String testrailPassword = "";
         private TestRailClient testrail = new TestRailClient("", "", "");
-
-        Logger logger = Logger.getLogger("RunsLog");
 
         /**
          * In order to load the persisted global configuration, you have to
@@ -322,37 +321,16 @@ public class TestRailNotifier extends Notifier {
             testrail.setUser(getTestrailUser());
             testrail.setPassword(getTestrailPassword());
 
+            ListBoxModel items = new ListBoxModel();
             try {
-
-                // This block configure the logger with handler and formatter
-                FileHandler fh = new FileHandler("/tmp/RunsLogFile.log");
-                logger.addHandler(fh);
-                SimpleFormatter formatter = new SimpleFormatter();
-                fh.setFormatter(formatter);
-
-                // the following statement is used to log any messages
-                logger.info("Run log");
-
-                ListBoxModel items = new ListBoxModel();
-                try {
-                    for (Run run : testrail.getProjectTestRuns(testrailProject, logger)) {
-                        logger.info("Run desc: " + run.getDescription() + ", run id: " + Integer.toString(run.getId()));
-                        items.add(run.getDescription(), Integer.toString(run.getId()));
-                    }
-                } catch (Exception e) {
-                    logger.info("Stuff went south: " + e);
+                for (Run run : testrail.getProjectTestRuns(testrailProject)) {
+                    items.add(run.getDescription(), Integer.toString(run.getId()));
                 }
-                return items;
-
-            } catch (SecurityException e) {
-                e.printStackTrace();
-
-                return null;
             } catch (IOException e) {
-                e.printStackTrace();
 
-                return null;
             }
+
+            return items;
         }
 
         public FormValidation doCheckTestrailSuite(@QueryParameter String value)

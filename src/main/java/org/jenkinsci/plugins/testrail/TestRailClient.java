@@ -245,27 +245,35 @@ public class TestRailClient {
         return cases;
     }
 
-    public Run[] getProjectTestRuns(int projectId, Logger logger) throws IOException {
+    public Run[] getProjectTestRuns(int projectId) throws IOException {
         String body = httpGet("index.php?/api/v2/get_runs/" + projectId).getBody();
         JSONArray json = new JSONArray(body);
 
-        logger.info("Runs json: " + json);
-
         int numberOfRuns = json.length();
-        Run[] runs = new Run[numberOfRuns];
+        Run[] runs = new Run[numberOfRuns + 1];
+
+        // Add an empty run to the collection. In the UI this will display as a blank row
+        // This gives the user an ability to create new Run, as opposed to adding new results
+        // to existing runs
+        Run emptyRun = new Run();
+
+        emptyRun.setId(-1);
+        emptyRun.setDescription("");
+        emptyRun.setSuiteId(-1);
+        emptyRun.setMilestoneId(-1);
+
+        runs[0] = emptyRun;
 
         for (int i = 0, c = numberOfRuns; i < c; i++) {
             JSONObject o = json.getJSONObject(i);
 
-            logger.info("Runs object: " + o);
-
-            runs[i] = createRunFromJson(o, logger);
+            runs[i + 1] = createRunFromJson(o);
         }
 
         return runs;
     }
 
-    private Run createRunFromJson(JSONObject o, Logger logger) {
+    private Run createRunFromJson(JSONObject o) {
         Run r = new Run();
 
         r.setDescription(o.getString("name"));
@@ -273,14 +281,12 @@ public class TestRailClient {
 
         if (!o.isNull("suite_id")) {
             r.setSuiteId(o.getInt("suite_id"));
-            logger.info("suite_id: " + o.getInt("suite_id"));
         } else {
             r.setSuiteId(-1);
         }
 
         if (!o.isNull("milestone_id")) {
             r.setMilestoneId(o.getInt("milestone_id"));
-            logger.info("milestone_id: " + o.getInt("milestone_id"));
         } else {
             r.setMilestoneId(-1);
         }
