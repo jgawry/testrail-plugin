@@ -254,7 +254,7 @@ public class TestRailClient {
 
         // Add an empty run to the collection. In the UI this will display as a blank row
         // This gives the user an ability to create new Run, as opposed to adding new results
-        // to existing runs
+        // to existing runs. See testrail.addRun call in TestRailNotifier
         Run emptyRun = new Run();
 
         emptyRun.setId(-1);
