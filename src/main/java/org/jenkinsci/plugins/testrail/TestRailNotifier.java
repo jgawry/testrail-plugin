@@ -25,9 +25,12 @@ import hudson.Util;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.BuildListener;
+import hudson.model.TaskListener;
 import hudson.util.ListBoxModel;
 import hudson.tasks.*;
 import hudson.util.FormValidation;
+import jenkins.tasks.SimpleBuildStep;
+import jenkins.util.BuildListenerAdapter;
 import net.sf.json.JSONObject;
 import org.jenkinsci.plugins.testrail.JunitResults.*;
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -35,15 +38,14 @@ import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 import org.jenkinsci.plugins.testrail.TestRailObjects.*;
 
+import javax.annotation.Nonnull;
 import javax.servlet.ServletException;
 import javax.xml.bind.JAXBException;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.List;
-import java.util.logging.FileHandler;
-import java.util.logging.Logger;
-import java.util.logging.SimpleFormatter;
 
-public class TestRailNotifier extends Notifier {
+public class TestRailNotifier extends Notifier implements SimpleBuildStep {
 
     private int testrailProject;
     private int testrailSuite;
@@ -52,6 +54,7 @@ public class TestRailNotifier extends Notifier {
     private String testrailMilestone;
     private boolean enableMilestone;
     private boolean createNewTestcases;
+    private FilePath workspace;
 
     // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
     @DataBoundConstructor
@@ -63,6 +66,7 @@ public class TestRailNotifier extends Notifier {
         this.testrailMilestone = testrailMilestone;
         this.enableMilestone = enableMilestone;
         this.createNewTestcases = createNewTestcases;
+        this.workspace = null;
     }
 
     public void setTestrailProject(int project) { this.testrailProject = project;}
@@ -87,11 +91,26 @@ public class TestRailNotifier extends Notifier {
         testrail.setUser(getDescriptor().getTestrailUser());
         testrail.setPassword(getDescriptor().getTestrailPassword());
 
+        PrintStream logger = listener.getLogger();
+
+        logger.println("Cannot find project or suite on TestRail server. Please check your Jenkins job and system configurations.");
+        logger.println("testrailProject: " + this.testrailProject);
+        logger.println("testrailSuite: " + this.testrailSuite);
+        logger.println("testrailRun: " + this.testrailRun);
+        logger.println("junitResultsGlob: " + this.junitResultsGlob);
+
         ExistingTestCases testCases = null;
         try {
             testCases = new ExistingTestCases(testrail, this.testrailProject, this.testrailSuite);
         } catch (ElementNotFoundException e) {
-            listener.getLogger().println("Cannot find project or suite on TestRail server. Please check your Jenkins job and system configurations.");
+            logger.println("Cannot find project or suite on TestRail server. Please check your Jenkins job and system configurations." + e.getMessage());
+            logger.println("testrailProject: " + this.testrailProject);
+            logger.println("testrailSuite: " + this.testrailSuite);
+            logger.println("testrailRun: " + this.testrailRun);
+            logger.println("junitResultsGlob: " + this.junitResultsGlob);
+            logger.println("enableMilestone: " + this.enableMilestone);
+            logger.println("createNewTestcases: " + this.createNewTestcases);
+
             return false;
         }
 
@@ -120,9 +139,8 @@ public class TestRailNotifier extends Notifier {
         // it looks like the destructor deletes the temp dir when we're finished
         FilePath tempdir = new FilePath(Util.createTempDir());
         // This picks up *all* result files so if you have old results in the same directory we'll see those, too.
-        FilePath ws = build.getWorkspace();
         try {
-            ws.copyRecursiveTo(junitResultsGlob, "", tempdir);
+            this.workspace.copyRecursiveTo(junitResultsGlob, "", tempdir);
         } catch (Exception e) {
             listener.getLogger().println("Error trying to copy files to Jenkins master: " + e.getMessage());
             return false;
@@ -145,7 +163,7 @@ public class TestRailNotifier extends Notifier {
         }
 
         listener.getLogger().println("Uploading results to TestRail.");
-        String runComment = "Automated results from Jenkins: " + build.getUrl().toString();
+        String runComment = "Automated results from Jenkins: " + this.workspace.getName();
         String milestoneId = testrailMilestone;
 
         int runId = -1;
@@ -173,12 +191,6 @@ public class TestRailNotifier extends Notifier {
             listener.getLogger().println("status: " + response.getStatus());
             listener.getLogger().println("body :\n" + response.getBody());
         }
-//        try {
-//            testrail.closeRun(runId);
-//        } catch (Exception e) {
-//            listener.getLogger().println("Failed to close test run in TestRail.");
-//            listener.getLogger().println("EXCEPTION: " + e.getMessage());
-//        }
 
         return buildResult;
     }
@@ -254,6 +266,12 @@ public class TestRailNotifier extends Notifier {
 
     public BuildStepMonitor getRequiredMonitorService() {
         return BuildStepMonitor.NONE; //null;
+    }
+
+    @Override
+    public void perform(@Nonnull hudson.model.Run<?, ?> run, @Nonnull FilePath filePath, @Nonnull Launcher launcher, @Nonnull TaskListener taskListener) throws InterruptedException, IOException {
+        this.workspace = filePath;
+        this.perform((AbstractBuild)null, launcher, new BuildListenerAdapter(taskListener));
     }
 
     @Extension
