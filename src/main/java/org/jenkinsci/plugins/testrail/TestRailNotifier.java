@@ -51,14 +51,14 @@ public class TestRailNotifier extends Notifier implements SimpleBuildStep {
     private int testrailSuite;
     private int testrailRun = -1;
     private String junitResultsGlob;
-    private String testrailMilestone;
+    private int testrailMilestone;
     private boolean enableMilestone;
     private boolean createNewTestcases;
     private FilePath workspace;
 
     // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
     @DataBoundConstructor
-    public TestRailNotifier(int testrailProject, int testrailSuite, int testrailRun, String junitResultsGlob, String testrailMilestone, boolean enableMilestone, boolean createNewTestcases) {
+    public TestRailNotifier(int testrailProject, int testrailSuite, int testrailRun, String junitResultsGlob, int testrailMilestone, boolean enableMilestone, boolean createNewTestcases) {
         this.testrailProject = testrailProject;
         this.testrailSuite = testrailSuite;
         this.testrailRun = testrailRun;
@@ -77,8 +77,8 @@ public class TestRailNotifier extends Notifier implements SimpleBuildStep {
     public int getTestrailRun() { return this.testrailRun; }
     public void setJunitResultsGlob(String glob) { this.junitResultsGlob = glob; }
     public String getJunitResultsGlob() { return this.junitResultsGlob; }
-    public String getTestrailMilestone() { return this.testrailMilestone; }
-    public void setTestrailMilestone(String milestone) { this.testrailMilestone = milestone; }
+    public int getTestrailMilestone() { return this.testrailMilestone; }
+    public void setTestrailMilestone(int milestone) { this.testrailMilestone = milestone; }
     public void setEnableMilestone(boolean mstone) {this.enableMilestone = mstone; }
     public boolean getEnableMilestone() { return  this.enableMilestone; }
     public void setCreateNewTestcases(boolean newcases) {this.createNewTestcases = newcases; }
@@ -109,6 +109,7 @@ public class TestRailNotifier extends Notifier implements SimpleBuildStep {
             logger.println("testrailRun: " + this.testrailRun);
             logger.println("junitResultsGlob: " + this.junitResultsGlob);
             logger.println("enableMilestone: " + this.enableMilestone);
+            logger.println("testrailMilestone: " + this.testrailMilestone);
             logger.println("createNewTestcases: " + this.createNewTestcases);
 
             return false;
@@ -164,14 +165,13 @@ public class TestRailNotifier extends Notifier implements SimpleBuildStep {
 
         listener.getLogger().println("Uploading results to TestRail.");
         String runComment = "Automated results from Jenkins: " + this.workspace.getName();
-        String milestoneId = testrailMilestone;
 
         int runId = -1;
         TestRailResponse response;
         try {
             // Test run was not selected in the UI
             if (testrailRun <= 0) {
-                runId = testrail.addRun(testCases.getProjectId(), testCases.getSuiteId(), milestoneId, runComment);
+                runId = testrail.addRun(testCases.getProjectId(), testCases.getSuiteId(), this.testrailMilestone, runComment);
             } else {
                 runId = testrailRun;
             }
